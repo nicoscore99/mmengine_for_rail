@@ -387,6 +387,11 @@ class ValLoop(BaseLoop):
         self.runner.call_hook(
             'before_val_iter', batch_idx=idx, data_batch=data_batch)
         # outputs should be sequence of BaseDataElement
+
+        # NOTE: This implementation is not optimal. The 'runner.call_hook'
+        # like this only influences the wandb logging hook and is likely not
+        # compatible with other hooks. At the same time, nothing is logged locally.
+
         with autocast(enabled=self.fp16):
             outputs = self.runner.model.val_step(data_batch)
             parsed_losses, log_vars = self.runner.model.val_step_losses(data_batch)
