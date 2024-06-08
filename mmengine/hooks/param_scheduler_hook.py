@@ -1,6 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from typing import Dict, Optional, Union
-
+from typing import Dict, Optional, Sequence, Union
 from mmengine.optim import _ParamScheduler
 from mmengine.registry import HOOKS
 from mmengine.utils import is_list_of
@@ -54,7 +54,9 @@ class ParamSchedulerHook(Hook):
                 'a dict containing list of ParamScheduler, '
                 f'but got {runner.param_schedulers}')
 
-    def after_train_epoch(self, runner) -> None:
+    def after_train_epoch(self, 
+                          runner,
+                          metrics: Optional[Dict[str, float]] = None) -> None:
         """Call step function for each scheduler after each training epoch.
 
         Args:

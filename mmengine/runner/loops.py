@@ -103,18 +103,52 @@ class EpochBasedTrainLoop(BaseLoop):
 
         self.runner.call_hook('after_train')
         return self.runner.model
+    
+    def add_outputs(self, total_outputs: Dict, iter_output: Dict) -> Dict:
+        """Add the outputs of the current iteration to the total outputs.
+
+        Args:
+            total_outputs (Dict): The total outputs of the current epoch.
+            iter_output (Dict): The outputs of the current iteration.
+
+        Returns:
+            Dict: The updated total outputs.
+        """
+
+        # Check if the keys are identical
+        if total_outputs.keys() and iter_output.keys():
+            if not total_outputs.keys() == iter_output.keys():
+                print("Warning: The keys of the outputs are not identical. The outputs will be added as they are.")
+                print("Keys of total_outputs: ", total_outputs.keys())
+                print("Keys of iter_output: ", iter_output.keys())
+
+        if not total_outputs:
+            return iter_output
+        for key, value in iter_output.items():
+            if key in total_outputs:
+                total_outputs[key] += value
+            else:
+                total_outputs[key] = value
+        return total_outputs
 
     def run_epoch(self) -> None:
         """Iterate one epoch."""
         self.runner.call_hook('before_train_epoch')
         self.runner.model.train()
+
+        total_outputs = dict()
         for idx, data_batch in enumerate(self.dataloader):
-            self.run_iter(idx, data_batch)
+            iter_output = self.run_iter(idx, data_batch)
+            total_outputs = self.add_outputs(total_outputs, iter_output)
 
-        self.runner.call_hook('after_train_epoch')
-        self._epoch += 1
+        average_outputs = {key: value / len(self.dataloader) for key, value in total_outputs.items()}
+        self.runner.call_hook('after_train_epoch',
+                              metrics = average_outputs)
 
-    def run_iter(self, idx, data_batch: Sequence[dict]) -> None:
+        # Not optimal at this position, because it increases before the validation has been done                      
+        self._epoch += 1 
+
+    def run_iter(self, idx, data_batch: Sequence[dict]) -> Dict:
         """Iterate one min-batch.
 
         Args:
@@ -134,6 +168,8 @@ class EpochBasedTrainLoop(BaseLoop):
             data_batch=data_batch,
             outputs=outputs)
         self._iter += 1
+
+        return outputs
 
     def _decide_current_val_interval(self) -> None:
         """Dynamically modify the ``val_interval``."""
@@ -362,16 +398,50 @@ class ValLoop(BaseLoop):
                 level=logging.WARNING)
         self.fp16 = fp16
 
+    def add_outputs(self, total_outputs: Dict, iter_output: Dict) -> Dict:
+        """Add the outputs of the current iteration to the total outputs.
+
+        Args:
+            total_outputs (Dict): The total outputs of the current epoch.
+            iter_output (Dict): The outputs of the current iteration.
+
+        Returns:
+            Dict: The updated total outputs.
+        """
+
+        # Check if the keys are identical
+        if total_outputs.keys() and iter_output.keys():
+            if not total_outputs.keys() == iter_output.keys():
+                print("Warning: The keys of the outputs are not identical. The outputs will be added as they are.")
+                print("Keys of total_outputs: ", total_outputs.keys())
+                print("Keys of iter_output: ", iter_output.keys())
+
+        if not total_outputs:
+            return iter_output
+        for key, value in iter_output.items():
+            if key in total_outputs:
+                total_outputs[key] += value
+            else:
+                total_outputs[key] = value
+        return total_outputs
+
     def run(self) -> dict:
         """Launch validation."""
         self.runner.call_hook('before_val')
         self.runner.call_hook('before_val_epoch')
         self.runner.model.eval()
+
+        total_outputs = dict()
         for idx, data_batch in enumerate(self.dataloader):
-            self.run_iter(idx, data_batch)
+            outputs = self.run_iter(idx, data_batch)
+            total_outputs = self.add_outputs(total_outputs, outputs)
 
         # compute metrics
         metrics = self.evaluator.evaluate(len(self.dataloader.dataset))
+
+        average_outputs = {key: value / len(self.dataloader) for key, value in total_outputs.items()}
+        metrics['log_vars'] = average_outputs
+
         self.runner.call_hook('after_val_epoch', metrics=metrics)
         self.runner.call_hook('after_val')
         return metrics
@@ -403,7 +473,8 @@ class ValLoop(BaseLoop):
             batch_idx=idx,
             data_batch=data_batch,
             outputs=log_vars)
-
+        
+        return log_vars
 
 @LOOPS.register_module()
 class TestLoop(BaseLoop):

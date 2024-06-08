@@ -1,6 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from typing import Dict, Optional, Sequence, Union
-
 from mmengine import is_method_overridden
 
 DATA_BATCH = Optional[Union[dict, tuple, list]]
@@ -134,14 +133,18 @@ class Hook:
         """
         self._before_epoch(runner, mode='test')
 
-    def after_train_epoch(self, runner) -> None:
+    def after_train_epoch(self, 
+                          runner,
+                          metrics: Optional[Dict[str, float]] = None) -> None:
         """All subclasses should override this method, if they need any
         operations after each training epoch.
 
         Args:
             runner (Runner): The runner of the training process.
         """
-        self._after_epoch(runner, mode='train')
+        self._after_epoch(runner, 
+                          mode='train',
+                          metrics=metrics)
 
     def after_val_epoch(self,
                         runner,
@@ -155,7 +158,8 @@ class Hook:
                 metrics on validation dataset. The keys are the names of the
                 metrics, and the values are corresponding results.
         """
-        self._after_epoch(runner, mode='val')
+        self._after_epoch(runner, 
+                          mode='val')
 
     def after_test_epoch(self,
                          runner,
@@ -291,7 +295,11 @@ class Hook:
             mode (str): Current mode of runner. Defaults to 'train'.
         """
 
-    def _after_epoch(self, runner, mode: str = 'train') -> None:
+    def _after_epoch(self, 
+                     runner, 
+                     mode: str = 'train',
+                     metrics: Optional[Dict[str, float]] = None
+                     ) -> None:
         """All subclasses should override this method, if they need any
         operations after each epoch.
 

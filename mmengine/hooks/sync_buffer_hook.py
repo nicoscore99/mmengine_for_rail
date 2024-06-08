@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from mmengine.dist import all_reduce_params, is_distributed
+from typing import Dict, Optional, Sequence, Union
 from mmengine.registry import HOOKS
 from .hook import Hook
 
@@ -32,7 +33,9 @@ class SyncBuffersHook(Hook):
                 all_reduce_params(runner.model.buffers(), op='mean')
             self.called_in_train = False
 
-    def after_train_epoch(self, runner) -> None:
+    def after_train_epoch(self, 
+                          runner,
+                          metrics: Optional[Dict[str, float]] = None) -> None:
         """All-reduce model buffers at the end of each epoch.
 
         Args:
