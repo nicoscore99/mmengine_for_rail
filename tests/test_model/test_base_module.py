@@ -91,6 +91,19 @@ class FooModel(BaseModule):
         # with "override" key.
         self.reg = nn.Linear(3, 4)
 
+@FOOMODELS.register_module()
+class FooModelForFreezing(BaseModule):
+    
+    def __init__(self, 
+                 init_cfg=None,
+                 freeze_cfg=None) -> None:
+        super().__init__(init_cfg)
+        self.conv1 = nn.Conv2d(3, 3, 3)
+        self.conv2 = nn.Conv2d(3, 3, 3)
+        self.linear = nn.Linear(3, 3)
+        self.linear2 = nn.Linear(3, 3)
+        
+        self.freeze_cfg = freeze_cfg
 
 class TestBaseModule(TestCase):
 
@@ -110,8 +123,9 @@ class TestBaseModule(TestCase):
             component4=dict(
                 type='FooLinearConv1d',
                 linear=dict(type='FooLinear'),
-                conv1d=dict(type='FooConv1d')))
-
+                conv1d=dict(type='FooConv1d'))
+        )
+            
         self.model = build_from_cfg(self.model_cfg, FOOMODELS)
         self.logger = MMLogger.get_instance(self._testMethodName)
 
@@ -452,3 +466,104 @@ class TestSequential(TestCase):
         self.assertTrue(
             torch.equal(seq_model[1].conv2d.bias,
                         torch.full(seq_model[1].conv2d.bias.shape, 3.)))
+        
+class TestWeightFreezing(TestCase):
+    
+        def setUp(self) -> None:
+            self.temp_dir = tempfile.TemporaryDirectory()
+            
+        def tearDown(self) -> None:
+            self.temp_dir.cleanup()
+            return super().tearDown()
+    
+        def test_freeze_all_parameters(self):
+            
+            model_cfg = dict(
+                type='FooModelForFreezing',
+                init_cfg=dict(
+                    type='Constant', val=1, bias=2, layer='Linear'),
+                freeze_cfg=dict(
+                    freeze_all=True
+                )
+            )
+            
+            model = build_from_cfg(model_cfg, FOOMODELS)
+            
+            model.freeze()
+            
+            for param in model.parameters():
+                print(param)
+                
+                self.assertFalse(param.requires_grad)
+                
+        def test_freeze_parameters(self):
+            
+            model_cfg = dict(
+                type='FooModelForFreezing',
+                init_cfg=dict(
+                    type='Constant', val=1, bias=2, layer='Linear'),
+                freeze_cfg=dict(
+                    freeze_params=['conv1.weight', 'conv1.bias']
+                )
+            )
+            
+            model = build_from_cfg(model_cfg, FOOMODELS)
+            
+            model.freeze()
+            
+            for name, param in model.named_parameters():
+                if name == 'conv1.weight' or name == 'conv1.bias':
+                    self.assertFalse(param.requires_grad)
+                else:
+                    self.assertTrue(param.requires_grad)
+                    
+        def test_freeze_nothing(self):
+            
+            model_cfg = dict(
+                type='FooModelForFreezing',
+                init_cfg=dict(
+                    type='Constant', val=1, bias=2, layer='Linear'),
+                freeze_cfg=dict(
+                    freeze_params=[]
+                )
+            )
+            
+            model = build_from_cfg(model_cfg, FOOMODELS)
+            
+            model.freeze()
+            
+            for param in model.parameters():
+                self.assertTrue(param.requires_grad)
+                
+        def test_freeze_nothing2(self):
+            
+            model_cfg = dict(
+                type='FooModelForFreezing',
+                init_cfg=dict(
+                    type='Constant', val=1, bias=2, layer='Linear'),
+                freeze_cfg=dict(
+                    freeze_params=None
+                )
+            )
+            
+            model = build_from_cfg(model_cfg, FOOMODELS)
+            
+            model.freeze()
+            
+            for param in model.parameters():
+                self.assertTrue(param.requires_grad)
+                
+        def test_freeze_nothing3(self):
+                
+                model_cfg = dict(
+                    type='FooModelForFreezing',
+                    init_cfg=dict(
+                        type='Constant', val=1, bias=2, layer='Linear'),
+                )
+                
+                model = build_from_cfg(model_cfg, FOOMODELS)
+                
+                model.freeze()
+                
+                for param in model.parameters():
+                    self.assertTrue(param.requires_grad)

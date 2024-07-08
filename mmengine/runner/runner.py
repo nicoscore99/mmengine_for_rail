@@ -925,6 +925,14 @@ class Runner:
             for name, params in model.state_dict().items():
                 broadcast(params)
 
+    def _freeze_model_weights(self) -> None:
+        """Freeze the model weights if the model has :meth:`freeze`"""
+
+        model = self.model.module if is_model_wrapper(
+            self.model) else self.model
+        if hasattr(model, 'freeze'):
+            model.freeze()
+
     def scale_lr(self,
                  optim_wrapper: OptimWrapper,
                  auto_scale_lr: Optional[Dict] = None) -> None:
@@ -1746,6 +1754,9 @@ class Runner:
 
         # initialize the model weights
         self._init_model_weights()
+
+        # freeze the model weights if specified in config
+        self._freeze_model_weights()
 
         # try to enable activation_checkpointing feature
         modules = self.cfg.get('activation_checkpointing', None)
