@@ -36,7 +36,10 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
         init_cfg (dict or List[dict], optional): Initialization config dict.
     """
 
-    def __init__(self, init_cfg: Union[dict, List[dict], None] = None):
+    def __init__(self, 
+                 init_cfg: Union[dict, List[dict], None] = None,
+                 freeze_cfg: Union[dict, None] = None
+                 ):
         """Initialize BaseModule, inherited from `torch.nn.Module`"""
 
         # NOTE init_cfg can be defined in different levels, but init_cfg
@@ -48,6 +51,7 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
         self._is_init = False
 
         self.init_cfg = copy.deepcopy(init_cfg)
+        self.freeze_cfg = copy.deepcopy(freeze_cfg)
 
         # Backward compatibility in derived classes
         # if pretrained is not None:

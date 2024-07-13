@@ -81,14 +81,14 @@ class ConcatDataset(_ConcatDataset):
                         f'The type {cur_type} of {key} in the {i}-th dataset '
                         'should be the same with the first dataset '
                         f'{first_type}')
-                if (isinstance(self._metainfo[key], np.ndarray)
-                        and not np.array_equal(self._metainfo[key],
-                                               dataset.metainfo[key])
-                        or (not isinstance(self._metainfo[key], np.ndarray)
-                            and self._metainfo[key] != dataset.metainfo[key])):
-                    raise ValueError(
-                        f'The meta information of the {i}-th dataset does not '
-                        'match meta information of the first dataset')
+                # if (isinstance(self._metainfo[key], np.ndarray)
+                #         and not np.array_equal(self._metainfo[key],
+                #                                dataset.metainfo[key])
+                #         or (not isinstance(self._metainfo[key], np.ndarray)
+                #             and self._metainfo[key] != dataset.metainfo[key])):
+                #     raise ValueError(
+                #         f'The meta information of the {i}-th dataset does not '
+                #         'match meta information of the first dataset')
 
         self._fully_initialized = False
         if not lazy_init:
