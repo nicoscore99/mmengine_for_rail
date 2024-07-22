@@ -194,10 +194,10 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
                         if name in self.freeze_cfg['freeze_params']:
                             param.requires_grad = False               
                     
-            # Handle the submodules
-            for module in self.children():
-                if isinstance(module, BaseModule):
-                    module.freeze()
+        # Handle the submodules
+        for module in self.children():
+            if isinstance(module, BaseModule):
+                module.freeze()
                 
     def unfreeze(self):
         """Unfreeze all parameters of the module."""

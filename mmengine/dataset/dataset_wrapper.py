@@ -393,7 +393,7 @@ class ClassBalancedDataset:
         self.dataset.full_init()
         # Get repeat factors for each image.
         repeat_factors = self._get_repeat_factors(self.dataset,
-                                                  self.oversample_thr)
+                                                  self.oversample_thr)        
         # Repeat dataset's indices according to repeat_factors. For example,
         # if `repeat_factors = [1, 2, 3]`, and the `len(dataset) == 3`,
         # the repeated indices will be [1, 2, 2, 3, 3, 3].
@@ -403,6 +403,11 @@ class ClassBalancedDataset:
         self.repeat_indices = repeat_indices
 
         self._fully_initialized = True
+        
+        # Print an overview of the class balanced dataset.
+        
+        print_log(f"Initialized as a ClassBalancedDataset with {len(self)} images", logger='current', level=logging.INFO)
+        print_log(f"Dataset size increased by {len(self) / len(self.dataset):.2f}x", logger='current', level=logging.INFO)
 
     def _get_repeat_factors(self, dataset: BaseDataset,
                             repeat_thr: float) -> List[float]:

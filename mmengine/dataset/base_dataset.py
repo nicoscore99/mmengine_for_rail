@@ -741,7 +741,7 @@ class BaseDataset(Dataset):
         elif isinstance(indices, float):
             # Return the first few data information according to the ratio of
             # dataset length.
-            assert 0 < indices < 1, 'The ratio of dataset length should be ' \
+            assert 0.0 <= indices <= 1.0, 'The ratio of dataset length should be ' \
                                     f'between 0 and 1, but got {indices}'
                                     
             # Take a random index subset of the dataset.
