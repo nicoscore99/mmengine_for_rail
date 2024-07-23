@@ -138,6 +138,8 @@ class EpochBasedTrainLoop(BaseLoop):
             outputs=outputs)
         self._iter += 1
 
+        print("Debug: Memory usage: ", torch.cuda.memory_allocated())
+
     def _decide_current_val_interval(self) -> None:
         """Dynamically modify the ``val_interval``."""
         step = bisect.bisect(self.dynamic_milestones, (self.epoch + 1))
