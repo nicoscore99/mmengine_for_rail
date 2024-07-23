@@ -123,13 +123,21 @@ class EpochBasedTrainLoop(BaseLoop):
         Args:
             data_batch (Sequence[dict]): Batch of data from dataloader.
         """
+
+        print("Debug: Memory usage 1: ", torch.cuda.memory_allocated())
+
         self.runner.call_hook(
             'before_train_iter', batch_idx=idx, data_batch=data_batch)
         # Enable gradient accumulation mode and avoid unnecessary gradient
         # synchronization during gradient accumulation process.
         # outputs should be a dict of loss.
+
+        print("Debug: Memory usage 2: ", torch.cuda.memory_allocated())
+
         outputs = self.runner.model.train_step(
             data_batch, optim_wrapper=self.runner.optim_wrapper)
+
+        print("Debug: Memory usage 3: ", torch.cuda.memory_allocated())
 
         self.runner.call_hook(
             'after_train_iter',
@@ -138,7 +146,7 @@ class EpochBasedTrainLoop(BaseLoop):
             outputs=outputs)
         self._iter += 1
 
-        print("Debug: Memory usage: ", torch.cuda.memory_allocated())
+        print("Debug: Memory usage 4: ", torch.cuda.memory_allocated())
 
     def _decide_current_val_interval(self) -> None:
         """Dynamically modify the ``val_interval``."""
