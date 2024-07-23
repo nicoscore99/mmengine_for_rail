@@ -169,6 +169,8 @@ class EpochBasedTrainLoop(BaseLoop):
             outputs=outputs)
         self._iter += 1
 
+        print("Debug: Memory usage: ", torch.cuda.memory_allocated())
+
         return outputs
 
     def _decide_current_val_interval(self) -> None:
