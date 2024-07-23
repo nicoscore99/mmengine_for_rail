@@ -115,6 +115,13 @@ class EpochBasedTrainLoop(BaseLoop):
             Dict: The updated total outputs.
         """
 
+        if iter_output.keys():
+            # All values to CPU
+            iter_output_cpu = {key: value.cpu().detach() for key, value in iter_output.items()}
+            # Remove the values from the GPU
+            del iter_output
+            iter_output = iter_output_cpu
+
         # Check if the keys are identical
         if total_outputs.keys() and iter_output.keys():
             if not total_outputs.keys() == iter_output.keys():
@@ -168,9 +175,7 @@ class EpochBasedTrainLoop(BaseLoop):
             data_batch=data_batch,
             outputs=outputs)
         self._iter += 1
-
-        print("Debug: Memory usage: ", torch.cuda.memory_allocated())
-
+        
         return outputs
 
     def _decide_current_val_interval(self) -> None:
