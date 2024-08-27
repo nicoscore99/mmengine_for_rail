@@ -40,6 +40,7 @@ class ConcatDataset(_ConcatDataset):
     def __init__(self,
                  datasets: Sequence[Union[BaseDataset, dict]],
                  lazy_init: bool = False,
+                 shuffle: bool = False,
                  ignore_keys: Union[str, List[str], None] = None):
         self.datasets: List[BaseDataset] = []
         for i, dataset in enumerate(datasets):
@@ -93,6 +94,11 @@ class ConcatDataset(_ConcatDataset):
         self._fully_initialized = False
         if not lazy_init:
             self.full_init()
+
+        self.shuffled_indices = None
+
+        if shuffle:
+            self.shuffle()
 
     @property
     def metainfo(self) -> dict:
@@ -167,8 +173,24 @@ class ConcatDataset(_ConcatDataset):
                 logger='current',
                 level=logging.WARNING)
             self.full_init()
+
+        idx = self.shuffled_idx_to_ori_idx(idx)
         dataset_idx, sample_idx = self._get_ori_dataset_idx(idx)
         return self.datasets[dataset_idx][sample_idx]
+    
+    def shuffled_idx_to_ori_idx(self, idx):
+        if self.shuffled_indices is not None:
+            return self.shuffled_indices[idx]
+        else:
+            return idx
+
+    def shuffle(self):
+        
+        if self.shuffled_indices is None:
+            self.shuffled_indices = np.random.permutation(len(self))
+        else:
+            raise ValueError('Dataset is already shuffled')      
+
 
     def get_subset_(self, indices: Union[List[int], int]) -> None:
         """Not supported in ``ConcatDataset`` for the ambiguous meaning of sub-
