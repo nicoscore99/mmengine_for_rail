@@ -100,6 +100,10 @@ def pseudo_collate(data_batch: Sequence) -> Any:
 
 
 @FUNCTIONS.register_module()
+def pytorch_collate(data_batch: Sequence) -> Any:
+    return torch_default_collate(data_batch)
+
+@FUNCTIONS.register_module()
 def default_collate(data_batch: Sequence) -> Any:
     """Convert list of data sampled from dataset into a batch of data, of which
     type consistent with the type of each data_itement in ``data_batch``.

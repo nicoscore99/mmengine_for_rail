@@ -326,7 +326,9 @@ class CheckpointHook(Hook):
             self.keep_ckpt_ids: deque = deque(keep_ckpt_ids,
                                               self.max_keep_ckpts)
 
-    def after_train_epoch(self, runner) -> None:
+    def after_train_epoch(self, 
+                          runner,
+                          metrics: Optional[Dict[str, float]] = None) -> None:
         """Save the checkpoint and synchronize buffers after each epoch.
 
         Args:

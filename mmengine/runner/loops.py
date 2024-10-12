@@ -8,10 +8,8 @@ import torch
 from torch.utils.data import DataLoader
 
 from mmengine.evaluator import Evaluator
-from mmengine.logging import HistoryBuffer, print_log
+from mmengine.logging import print_log
 from mmengine.registry import LOOPS
-from mmengine.structures import BaseDataElement
-from mmengine.utils import is_list_of
 from .amp import autocast
 from .base_loop import BaseLoop
 from .utils import calc_dynamic_intervals
@@ -100,24 +98,64 @@ class EpochBasedTrainLoop(BaseLoop):
             self._decide_current_val_interval()
             if (self.runner.val_loop is not None
                     and self._epoch >= self.val_begin
-                    and (self._epoch % self.val_interval == 0
-                         or self._epoch == self._max_epochs)):
+                    and self._epoch % self.val_interval == 0):
                 self.runner.val_loop.run()
 
         self.runner.call_hook('after_train')
         return self.runner.model
+    
+    def add_outputs(self, total_outputs: Dict, iter_output: Dict) -> Dict:
+        """Add the outputs of the current iteration to the total outputs.
+
+        Args:
+            total_outputs (Dict): The total outputs of the current epoch.
+            iter_output (Dict): The outputs of the current iteration.
+
+        Returns:
+            Dict: The updated total outputs.
+        """
+
+        if iter_output.keys():
+            # All values to CPU
+            iter_output_cpu = {key: value.cpu().detach() for key, value in iter_output.items()}
+            # Remove the values from the GPU
+            del iter_output
+            iter_output = iter_output_cpu
+
+        # Check if the keys are identical
+        if total_outputs.keys() and iter_output.keys():
+            if not total_outputs.keys() == iter_output.keys():
+                print("Warning: The keys of the outputs are not identical. The outputs will be added as they are.")
+                print("Keys of total_outputs: ", total_outputs.keys())
+                print("Keys of iter_output: ", iter_output.keys())
+
+        if not total_outputs:
+            return iter_output
+        for key, value in iter_output.items():
+            if key in total_outputs:
+                total_outputs[key] += value
+            else:
+                total_outputs[key] = value
+        return total_outputs
 
     def run_epoch(self) -> None:
         """Iterate one epoch."""
         self.runner.call_hook('before_train_epoch')
         self.runner.model.train()
+
+        total_outputs = dict()
         for idx, data_batch in enumerate(self.dataloader):
-            self.run_iter(idx, data_batch)
+            iter_output = self.run_iter(idx, data_batch)
+            total_outputs = self.add_outputs(total_outputs, iter_output)
 
-        self.runner.call_hook('after_train_epoch')
-        self._epoch += 1
+        average_outputs = {key: value / len(self.dataloader) for key, value in total_outputs.items()}
+        self.runner.call_hook('after_train_epoch',
+                              metrics = average_outputs)
 
-    def run_iter(self, idx, data_batch: Sequence[dict]) -> None:
+        # Not optimal at this position, because it increases before the validation has been done                      
+        self._epoch += 1 
+
+    def run_iter(self, idx, data_batch: Sequence[dict]) -> Dict:
         """Iterate one min-batch.
 
         Args:
@@ -145,6 +183,8 @@ class EpochBasedTrainLoop(BaseLoop):
             data_batch=data_batch,
             outputs=outputs)
         self._iter += 1
+        
+        return outputs
 
         print("Debug: Memory usage 4: ", torch.cuda.memory_allocated())
 
@@ -301,8 +341,7 @@ class IterBasedTrainLoop(BaseLoop):
             self._decide_current_val_interval()
             if (self.runner.val_loop is not None
                     and self._iter >= self.val_begin
-                    and (self._iter % self.val_interval == 0
-                         or self._iter == self._max_iters)):
+                    and self._iter % self.val_interval == 0):
                 self.runner.val_loop.run()
 
         self.runner.call_hook('after_train_epoch')
@@ -375,7 +414,33 @@ class ValLoop(BaseLoop):
                 logger='current',
                 level=logging.WARNING)
         self.fp16 = fp16
-        self.val_loss: Dict[str, HistoryBuffer] = dict()
+
+    def add_outputs(self, total_outputs: Dict, iter_output: Dict) -> Dict:
+        """Add the outputs of the current iteration to the total outputs.
+
+        Args:
+            total_outputs (Dict): The total outputs of the current epoch.
+            iter_output (Dict): The outputs of the current iteration.
+
+        Returns:
+            Dict: The updated total outputs.
+        """
+
+        # Check if the keys are identical
+        if total_outputs.keys() and iter_output.keys():
+            if not total_outputs.keys() == iter_output.keys():
+                print("Warning: The keys of the outputs are not identical. The outputs will be added as they are.")
+                print("Keys of total_outputs: ", total_outputs.keys())
+                print("Keys of iter_output: ", iter_output.keys())
+
+        if not total_outputs:
+            return iter_output
+        for key, value in iter_output.items():
+            if key in total_outputs:
+                total_outputs[key] += value
+            else:
+                total_outputs[key] = value
+        return total_outputs
 
     def run(self) -> dict:
         """Launch validation."""
@@ -383,17 +448,16 @@ class ValLoop(BaseLoop):
         self.runner.call_hook('before_val_epoch')
         self.runner.model.eval()
 
-        # clear val loss
-        self.val_loss.clear()
+        total_outputs = dict()
         for idx, data_batch in enumerate(self.dataloader):
-            self.run_iter(idx, data_batch)
+            outputs = self.run_iter(idx, data_batch)
+            total_outputs = self.add_outputs(total_outputs, outputs)
 
         # compute metrics
         metrics = self.evaluator.evaluate(len(self.dataloader.dataset))
 
-        if self.val_loss:
-            loss_dict = _parse_losses(self.val_loss, 'val')
-            metrics.update(loss_dict)
+        average_outputs = {key: value / len(self.dataloader) for key, value in total_outputs.items()}
+        metrics['log_vars'] = average_outputs
 
         self.runner.call_hook('after_val_epoch', metrics=metrics)
         self.runner.call_hook('after_val')
@@ -410,18 +474,24 @@ class ValLoop(BaseLoop):
         self.runner.call_hook(
             'before_val_iter', batch_idx=idx, data_batch=data_batch)
         # outputs should be sequence of BaseDataElement
+
+        # NOTE: This implementation is not optimal. The 'runner.call_hook'
+        # like this only influences the wandb logging hook and is likely not
+        # compatible with other hooks. At the same time, nothing is logged locally.
+
         with autocast(enabled=self.fp16):
             outputs = self.runner.model.val_step(data_batch)
-
-        outputs, self.val_loss = _update_losses(outputs, self.val_loss)
-
+            parsed_losses, log_vars = self.runner.model.val_step_losses(data_batch)
+            
         self.evaluator.process(data_samples=outputs, data_batch=data_batch)
+        
         self.runner.call_hook(
             'after_val_iter',
             batch_idx=idx,
             data_batch=data_batch,
-            outputs=outputs)
-
+            outputs=log_vars)
+        
+        return log_vars
 
 @LOOPS.register_module()
 class TestLoop(BaseLoop):
@@ -459,26 +529,17 @@ class TestLoop(BaseLoop):
                 logger='current',
                 level=logging.WARNING)
         self.fp16 = fp16
-        self.test_loss: Dict[str, HistoryBuffer] = dict()
 
     def run(self) -> dict:
         """Launch test."""
         self.runner.call_hook('before_test')
         self.runner.call_hook('before_test_epoch')
         self.runner.model.eval()
-
-        # clear test loss
-        self.test_loss.clear()
         for idx, data_batch in enumerate(self.dataloader):
             self.run_iter(idx, data_batch)
 
         # compute metrics
         metrics = self.evaluator.evaluate(len(self.dataloader.dataset))
-
-        if self.test_loss:
-            loss_dict = _parse_losses(self.test_loss, 'test')
-            metrics.update(loss_dict)
-
         self.runner.call_hook('after_test_epoch', metrics=metrics)
         self.runner.call_hook('after_test')
         return metrics
@@ -495,66 +556,9 @@ class TestLoop(BaseLoop):
         # predictions should be sequence of BaseDataElement
         with autocast(enabled=self.fp16):
             outputs = self.runner.model.test_step(data_batch)
-
-        outputs, self.test_loss = _update_losses(outputs, self.test_loss)
-
         self.evaluator.process(data_samples=outputs, data_batch=data_batch)
         self.runner.call_hook(
             'after_test_iter',
             batch_idx=idx,
             data_batch=data_batch,
             outputs=outputs)
-
-
-def _parse_losses(losses: Dict[str, HistoryBuffer],
-                  stage: str) -> Dict[str, float]:
-    """Parses the raw losses of the network.
-
-    Args:
-        losses (dict): raw losses of the network.
-        stage (str): The stage of loss, e.g., 'val' or 'test'.
-
-    Returns:
-        dict[str, float]: The key is the loss name, and the value is the
-        average loss.
-    """
-    all_loss = 0
-    loss_dict: Dict[str, float] = dict()
-
-    for loss_name, loss_value in losses.items():
-        avg_loss = loss_value.mean()
-        loss_dict[loss_name] = avg_loss
-        if 'loss' in loss_name:
-            all_loss += avg_loss
-
-    loss_dict[f'{stage}_loss'] = all_loss
-    return loss_dict
-
-
-def _update_losses(outputs: list, losses: dict) -> Tuple[list, dict]:
-    """Update and record the losses of the network.
-
-    Args:
-        outputs (list): The outputs of the network.
-        losses (dict): The losses of the network.
-
-    Returns:
-        list: The updated outputs of the network.
-        dict: The updated losses of the network.
-    """
-    if isinstance(outputs[-1],
-                  BaseDataElement) and outputs[-1].keys() == ['loss']:
-        loss = outputs[-1].loss  # type: ignore
-        outputs = outputs[:-1]
-    else:
-        loss = dict()
-
-    for loss_name, loss_value in loss.items():
-        if loss_name not in losses:
-            losses[loss_name] = HistoryBuffer()
-        if isinstance(loss_value, torch.Tensor):
-            losses[loss_name].update(loss_value.item())
-        elif is_list_of(loss_value, torch.Tensor):
-            for loss_value_i in loss_value:
-                losses[loss_name].update(loss_value_i.item())
-    return outputs, losses

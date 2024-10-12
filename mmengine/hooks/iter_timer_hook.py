@@ -42,7 +42,10 @@ class IterTimerHook(Hook):
         """
         self.t = time.time()
 
-    def _after_epoch(self, runner, mode: str = 'train') -> None:
+    def _after_epoch(self, 
+                     runner,
+                     metrics: Optional[dict] = None,
+                     mode: str = 'train') -> None:
         self.time_sec_test_val = 0
 
     def _before_iter(self,

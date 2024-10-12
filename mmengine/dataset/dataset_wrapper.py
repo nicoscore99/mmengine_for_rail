@@ -40,6 +40,7 @@ class ConcatDataset(_ConcatDataset):
     def __init__(self,
                  datasets: Sequence[Union[BaseDataset, dict]],
                  lazy_init: bool = False,
+                 shuffle: bool = False,
                  ignore_keys: Union[str, List[str], None] = None):
         self.datasets: List[BaseDataset] = []
         for i, dataset in enumerate(datasets):
@@ -81,18 +82,23 @@ class ConcatDataset(_ConcatDataset):
                         f'The type {cur_type} of {key} in the {i}-th dataset '
                         'should be the same with the first dataset '
                         f'{first_type}')
-                if (isinstance(self._metainfo[key], np.ndarray)
-                        and not np.array_equal(self._metainfo[key],
-                                               dataset.metainfo[key])
-                        or (not isinstance(self._metainfo[key], np.ndarray)
-                            and self._metainfo[key] != dataset.metainfo[key])):
-                    raise ValueError(
-                        f'The meta information of the {i}-th dataset does not '
-                        'match meta information of the first dataset')
+                # if (isinstance(self._metainfo[key], np.ndarray)
+                #         and not np.array_equal(self._metainfo[key],
+                #                                dataset.metainfo[key])
+                #         or (not isinstance(self._metainfo[key], np.ndarray)
+                #             and self._metainfo[key] != dataset.metainfo[key])):
+                #     raise ValueError(
+                #         f'The meta information of the {i}-th dataset does not '
+                #         'match meta information of the first dataset')
 
         self._fully_initialized = False
         if not lazy_init:
             self.full_init()
+
+        self.shuffled_indices = None
+
+        if shuffle:
+            self.shuffle()
 
     @property
     def metainfo(self) -> dict:
@@ -167,8 +173,24 @@ class ConcatDataset(_ConcatDataset):
                 logger='current',
                 level=logging.WARNING)
             self.full_init()
+
+        idx = self.shuffled_idx_to_ori_idx(idx)
         dataset_idx, sample_idx = self._get_ori_dataset_idx(idx)
         return self.datasets[dataset_idx][sample_idx]
+    
+    def shuffled_idx_to_ori_idx(self, idx):
+        if self.shuffled_indices is not None:
+            return self.shuffled_indices[idx]
+        else:
+            return idx
+
+    def shuffle(self):
+        
+        if self.shuffled_indices is None:
+            self.shuffled_indices = np.random.permutation(len(self))
+        else:
+            raise ValueError('Dataset is already shuffled')      
+
 
     def get_subset_(self, indices: Union[List[int], int]) -> None:
         """Not supported in ``ConcatDataset`` for the ambiguous meaning of sub-
@@ -393,7 +415,7 @@ class ClassBalancedDataset:
         self.dataset.full_init()
         # Get repeat factors for each image.
         repeat_factors = self._get_repeat_factors(self.dataset,
-                                                  self.oversample_thr)
+                                                  self.oversample_thr)        
         # Repeat dataset's indices according to repeat_factors. For example,
         # if `repeat_factors = [1, 2, 3]`, and the `len(dataset) == 3`,
         # the repeated indices will be [1, 2, 2, 3, 3, 3].
@@ -403,6 +425,11 @@ class ClassBalancedDataset:
         self.repeat_indices = repeat_indices
 
         self._fully_initialized = True
+        
+        # Print an overview of the class balanced dataset.
+        
+        print_log(f"Initialized as a ClassBalancedDataset with {len(self)} images", logger='current', level=logging.INFO)
+        print_log(f"Dataset size increased by {len(self) / len(self.dataset):.2f}x", logger='current', level=logging.INFO)
 
     def _get_repeat_factors(self, dataset: BaseDataset,
                             repeat_thr: float) -> List[float]:

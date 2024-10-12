@@ -21,7 +21,7 @@ from mmengine.device import get_device
 from mmengine.fileio import (get_file_backend, isdir, join_path,
                              list_dir_or_file, load)
 from mmengine.logging import print_log
-from mmengine.registry import FUNCTIONS, MODELS, VISUALIZERS, DefaultScope
+from mmengine.registry import FUNCTIONS, MODELS, VISUALIZERS, DefaultScope, UPSAMPLERS
 from mmengine.runner.checkpoint import (_load_checkpoint,
                                         _load_checkpoint_to_model)
 from mmengine.structures import InstanceData

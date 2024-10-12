@@ -36,7 +36,10 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
         init_cfg (dict or List[dict], optional): Initialization config dict.
     """
 
-    def __init__(self, init_cfg: Union[dict, List[dict], None] = None):
+    def __init__(self, 
+                 init_cfg: Union[dict, List[dict], None] = None,
+                 freeze_cfg: Union[dict, None] = None
+                 ):
         """Initialize BaseModule, inherited from `torch.nn.Module`"""
 
         # NOTE init_cfg can be defined in different levels, but init_cfg
@@ -48,6 +51,7 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
         self._is_init = False
 
         self.init_cfg = copy.deepcopy(init_cfg)
+        self.freeze_cfg = copy.deepcopy(freeze_cfg)
 
         # Backward compatibility in derived classes
         # if pretrained is not None:
@@ -155,6 +159,55 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
 
             for sub_module in self.modules():
                 del sub_module._params_init_info
+                    
+    def freeze(self):
+        """Freeze the specified parameters of the module.
+
+        'freeze_cfg' should look like this:
+        
+        freeze_cfg = {
+            'freeze_all': True,
+            'freeze_params': ['param1', 'param2'] # e.g. ['fc1', 'fc2.bias']
+        }
+        """
+        
+        if self.freeze_cfg:
+            print(f"Freezing parameters of {self.__class__.__name__}")
+            # Key is contained in the freeze_cfg
+            if 'freeze_all' in self.freeze_cfg:
+                # Case True
+                if self.freeze_cfg['freeze_all']:
+                    # Freeze all parameters
+                    for param in self.parameters():
+                        param.requires_grad = False
+                                          
+            # Freeze parameters only has to be considered if freeze_all is not True      
+            elif 'freeze_params' in self.freeze_cfg:
+                if self.freeze_cfg['freeze_params']:
+                    # Check that all the parameters are actually contained in the model
+                    for param in self.freeze_cfg['freeze_params']:
+                        if param not in [name for name, _ in self.named_parameters()]:
+                            raise ValueError(f"Parameter '{param}' not found in model")
+                        
+                    # Freeze the specified parameters
+                    for name, param in self.named_parameters():
+                        if name in self.freeze_cfg['freeze_params']:
+                            param.requires_grad = False               
+                    
+        # Handle the submodules
+        for module in self.children():
+            if isinstance(module, BaseModule):
+                module.freeze()
+                
+    def unfreeze(self):
+        """Unfreeze all parameters of the module."""
+        for param in self.parameters():
+            param.requires_grad = True
+
+        # Additionally unfreeze parameters in submodules
+        for module in self.children():
+            if isinstance(module, BaseModule):
+                module.unfreeze()
 
     @master_only
     def _dump_init_info(self):
@@ -185,7 +238,6 @@ class BaseModule(nn.Module, metaclass=ABCMeta):
         if self.init_cfg:
             s += f'\ninit_cfg={self.init_cfg}'
         return s
-
 
 class Sequential(BaseModule, nn.Sequential):
     """Sequential module in openmmlab.

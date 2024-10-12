@@ -4,7 +4,7 @@ import os
 import os.path as osp
 import sys
 from typing import Callable, Optional, Union
-
+from typing import Dict, Optional, Sequence, Union
 import torch
 
 from mmengine.dist import master_only
@@ -225,7 +225,9 @@ class ProfilerHook(Hook):
                 f'but got {self.on_trace_ready}')
         return _on_trace_ready
 
-    def after_train_epoch(self, runner):
+    def after_train_epoch(self, 
+                          runner,
+                          metrics: Optional[Dict[str, float]] = None) -> None:
         """Determine if the content is exported."""
         # `after_train_epoch` will also be called in IterBasedTrainLoop.
         # Here we check `self._closed` to avoid exiting twice.

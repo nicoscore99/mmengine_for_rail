@@ -4,6 +4,7 @@ import functools
 import gc
 import logging
 import pickle
+import random
 from collections.abc import Mapping
 from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
@@ -219,7 +220,7 @@ class BaseDataset(Dataset):
                  data_root: Optional[str] = '',
                  data_prefix: dict = dict(img_path=''),
                  filter_cfg: Optional[dict] = None,
-                 indices: Optional[Union[int, Sequence[int]]] = None,
+                 indices: Optional[Union[int, float, Sequence[int]]] = None,
                  serialize_data: bool = True,
                  pipeline: List[Union[dict, Callable]] = [],
                  test_mode: bool = False,
@@ -712,7 +713,7 @@ class BaseDataset(Dataset):
         return sub_data_bytes, sub_data_address  # type: ignore
 
     def _get_unserialized_subset(self, indices: Union[Sequence[int],
-                                                      int]) -> list:
+                                                      int, float]) -> list:
         """Get subset of data information list.
 
         Args:
@@ -737,6 +738,18 @@ class BaseDataset(Dataset):
             sub_data_list = []
             for idx in indices:
                 sub_data_list.append(self.data_list[idx])
+        elif isinstance(indices, float):
+            # Return the first few data information according to the ratio of
+            # dataset length.
+            assert 0.0 <= indices <= 1.0, 'The ratio of dataset length should be ' \
+                                    f'between 0 and 1, but got {indices}'
+                                    
+            # Take a random index subset of the dataset.
+            num_elements = int(len(self.data_list) * indices)
+                                    
+            sub_data_list = random.sample(self.data_list, num_elements)
+            
+            print("Reduced dataset size to: ", len(sub_data_list))
         else:
             raise TypeError('indices should be a int or sequence of int, '
                             f'but got {type(indices)}')

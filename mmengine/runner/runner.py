@@ -16,6 +16,7 @@ import torch.nn as nn
 from torch.nn.parallel.distributed import DistributedDataParallel
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
+import multiprocessing
 
 import mmengine
 from mmengine.config import Config, ConfigDict
@@ -35,7 +36,7 @@ from mmengine.optim import (OptimWrapper, OptimWrapperDict, _ParamScheduler,
                             build_optim_wrapper)
 from mmengine.registry import (DATA_SAMPLERS, DATASETS, EVALUATOR, FUNCTIONS,
                                HOOKS, LOG_PROCESSORS, LOOPS, MODEL_WRAPPERS,
-                               MODELS, OPTIM_WRAPPERS, PARAM_SCHEDULERS,
+                               MODELS, OPTIM_WRAPPERS, PARAM_SCHEDULERS, UPSAMPLERS,
                                RUNNERS, VISUALIZERS, DefaultScope)
 from mmengine.utils import apply_to, digit_version, get_git_hash, is_seq_of
 from mmengine.utils.dl_utils import (TORCH_VERSION, collect_env,
@@ -925,6 +926,14 @@ class Runner:
             for name, params in model.state_dict().items():
                 broadcast(params)
 
+    def _freeze_model_weights(self) -> None:
+        """Freeze the model weights if the model has :meth:`freeze`"""
+
+        model = self.model.module if is_model_wrapper(
+            self.model) else self.model
+        if hasattr(model, 'freeze'):
+            model.freeze()
+
     def scale_lr(self,
                  optim_wrapper: OptimWrapper,
                  auto_scale_lr: Optional[Dict] = None) -> None:
@@ -1479,6 +1488,8 @@ class Runner:
             batch_sampler=batch_sampler,
             collate_fn=collate_fn,
             worker_init_fn=init_fn,
+            # Really no idea what this does. Had to implement it to get the upsampling running with Open3D.
+            multiprocessing_context=multiprocessing.get_context("spawn"),
             **dataloader_cfg)
         return data_loader
 
@@ -1746,6 +1757,9 @@ class Runner:
 
         # initialize the model weights
         self._init_model_weights()
+
+        # freeze the model weights if specified in config
+        self._freeze_model_weights()
 
         # try to enable activation_checkpointing feature
         modules = self.cfg.get('activation_checkpointing', None)

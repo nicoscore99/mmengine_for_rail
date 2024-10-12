@@ -110,11 +110,45 @@ class BaseModel(BaseModule):
         """
         # Enable automatic mixed precision training context.
         with optim_wrapper.optim_context(self):
+
+            # print("Deta before data_preprocessor: ", data)
+
             data = self.data_preprocessor(data, True)
+
+            # print("Debugging data_preprocessor: ", data)
+            # print("Tpye of data_preprocessor: ", type(data))
+
+            # raise Exception("Debugging")
+
             losses = self._run_forward(data, mode='loss')  # type: ignore
+
+            # print("Debugging losses: ", losses)
+            # print("Tpye of losses: ", type(losses))
+
+            # raise Exception("Debugging")
+
         parsed_losses, log_vars = self.parse_losses(losses)  # type: ignore
         optim_wrapper.update_params(parsed_losses)
         return log_vars
+    
+    def val_step_losses(self, data: Union[tuple, dict, list]) -> list:
+        """Gets the losses of given data.
+
+        Calls ``self.data_preprocessor(data, True)`` and
+        ``self(inputs, data_sample, mode='loss')`` in order. Return the losses
+        which will be passed to evaluator.
+
+        Args:
+            data (dict or tuple or list): Data sampled from dataset.
+
+        Returns:
+            list: The losses of given data.
+        """
+        data = self.data_preprocessor(data, True)
+        losses = self._run_forward(data, mode='loss')
+        parsed_losses, log_vars = self.parse_losses(losses)
+
+        return parsed_losses, log_vars
 
     def val_step(self, data: Union[tuple, dict, list]) -> list:
         """Gets the predictions of given data.
@@ -130,6 +164,10 @@ class BaseModel(BaseModule):
             list: The predictions of given data.
         """
         data = self.data_preprocessor(data, False)
+
+        # print("Data after data_preprocessor: ", data)
+        # raise Exception("Debugging")
+
         return self._run_forward(data, mode='predict')  # type: ignore
 
     def test_step(self, data: Union[dict, tuple, list]) -> list:
