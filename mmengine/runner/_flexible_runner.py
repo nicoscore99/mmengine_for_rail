@@ -21,7 +21,7 @@ from mmengine.hooks import Hook
 from mmengine.logging import MessageHub, print_log
 from mmengine.optim import OptimWrapper, OptimWrapperDict, _ParamScheduler
 from mmengine.registry import (DATA_SAMPLERS, DATASETS, EVALUATOR, FUNCTIONS,
-                               HOOKS, LOG_PROCESSORS, LOOPS, RUNNERS,
+                               HOOKS, LOG_PROCESSORS, LOOPS, RUNNERS, UPSAMPLERS,
                                STRATEGIES, VISUALIZERS, DefaultScope)
 from mmengine.utils import digit_version
 from mmengine.utils.dl_utils import TORCH_VERSION

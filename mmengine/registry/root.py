@@ -65,3 +65,6 @@ INFERENCERS = Registry('inferencer')
 
 # manage function
 FUNCTIONS = Registry('function')
+
+# upsampling modules
+UPSAMPLERS = Registry('upsampler')

@@ -8,7 +8,7 @@ from .root import (DATA_SAMPLERS, DATASETS, EVALUATOR, FUNCTIONS, HOOKS,
                    MODELS, OPTIM_WRAPPER_CONSTRUCTORS, OPTIM_WRAPPERS,
                    OPTIMIZERS, PARAM_SCHEDULERS, RUNNER_CONSTRUCTORS, RUNNERS,
                    STRATEGIES, TASK_UTILS, TRANSFORMS, VISBACKENDS,
-                   VISUALIZERS, WEIGHT_INITIALIZERS)
+                   VISUALIZERS, WEIGHT_INITIALIZERS, UPSAMPLERS)
 from .utils import (count_registered_modules, init_default_scope,
                     traverse_registry_tree)
 
@@ -20,5 +20,5 @@ __all__ = [
     'VISBACKENDS', 'VISUALIZERS', 'LOG_PROCESSORS', 'EVALUATOR', 'INFERENCERS',
     'DefaultScope', 'traverse_registry_tree', 'count_registered_modules',
     'build_model_from_cfg', 'build_runner_from_cfg', 'build_from_cfg',
-    'build_scheduler_from_cfg', 'init_default_scope', 'FUNCTIONS', 'STRATEGIES'
+    'build_scheduler_from_cfg', 'init_default_scope', 'FUNCTIONS', 'STRATEGIES', 'UPSAMPLERS'
 ]
