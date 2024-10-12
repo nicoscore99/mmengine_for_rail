@@ -16,3 +16,10 @@ Point cloud classification training in MMDetection3D relies on the [Open3D BallP
 
 ### Upsampler Registry
 Created a new [registry](mmengine/registry/root.py) to register different point cloud up-sampling algorithms in MMDetection3D.
+
+## Installation
+Installation with setup.py:
+
+```bash
+sudo python3 setup.py install
+```
